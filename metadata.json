@@ -1,0 +1,10 @@
+{
+  "name": "食运通",
+  "description": "上传食材图片及当时的心情、口味等信息，由玄学大模型分析食材并结合风水运道为您推荐专属灵膳。",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
