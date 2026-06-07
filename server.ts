@@ -33,9 +33,22 @@ const deleteRecipe = db.prepare("DELETE FROM recipes WHERE id = ?");
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
+  const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 
   app.use(express.json({ limit: "50mb" }));
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", CORS_ORIGIN);
+    res.header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+
+    next();
+  });
 
   // API constraints
   const SILICONFLOW_API_KEY = process.env.SILICONFLOW_API_KEY || "sk-qvpckopchrgnkpronkzwxbvzwaebzwltdgzamzaupucuddvu";
@@ -300,6 +313,14 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  app.use("/api", (req, res) => {
+    res.status(404).json({
+      error: "API route not found",
+      path: req.path,
+      method: req.method,
+    });
   });
 
   // Vite middleware for development

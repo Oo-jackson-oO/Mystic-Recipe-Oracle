@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { Sparkles, Image as ImageIcon, Camera, Upload, BookOpen, ChevronDown, ChevronUp, Save, Star, ArrowLeft, Loader2, Search, History, Trash2, Compass } from "lucide-react";
 import { RecipeRecommendation, SavedRecipe } from "./types";
 import { motion, AnimatePresence } from "motion/react";
+import { apiJson, resolveApiUrl } from "./api";
 
 const MYSTIC_QUOTES = [
   "天机小贴士：万物皆有灵，每一次食材的交融都是星轨的重合。",
@@ -32,6 +33,24 @@ const CULTIVATION_RANKS = [
   { name: "化神", bg: "bg-slate-900", text: "text-amber-100", accent: "bg-gradient-to-r from-red-600 to-amber-600", border: "border-red-800" },
   { name: "羽化登仙", bg: "bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-indigo-950 to-black", text: "text-amber-200", accent: "bg-gradient-to-r from-amber-300 to-yellow-500", border: "border-amber-700" },
 ];
+
+async function reportDebugEvent(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
+  // #region debug-point A:network-report
+  await fetch("http://198.18.0.1:7777/event", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: "android-json-parse",
+      runId: "pre-fix",
+      hypothesisId,
+      location,
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+}
 
 function useCultivation() {
   const [rank, setRank] = useState(0);
@@ -184,8 +203,17 @@ export default function App() {
     
     try {
       const base64 = await getBase64(imageFile);
+      const requestUrl = resolveApiUrl("/api/recommend");
+      // #region debug-point B:recommend-request
+      void reportDebugEvent("B", "src/App.tsx:onSubmit:beforeFetch", "recommend request start", {
+        href: window.location.href,
+        origin: window.location.origin,
+        userAgent: navigator.userAgent,
+        requestUrl,
+      });
+      // #endregion
       
-      const response = await fetch("/api/recommend", {
+      const { data: result, response } = await apiJson<RecipeRecommendation>("/api/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -197,12 +225,22 @@ export default function App() {
           luckyNumber
         })
       });
-      
-      if (!response.ok) {
-        throw new Error("天师目前在闭关，请稍后再试...");
-      }
-      
-      const result = await response.json();
+      // #region debug-point C:recommend-response
+      void reportDebugEvent("C", "src/App.tsx:onSubmit:afterFetch", "recommend response received", {
+        requestUrl,
+        status: response.status,
+        ok: response.ok,
+        redirected: response.redirected,
+        responseUrl: response.url,
+        contentType: response.headers.get("content-type"),
+      });
+      // #endregion
+      // #region debug-point D:recommend-json
+      void reportDebugEvent("D", "src/App.tsx:onSubmit:afterJson", "recommend json parsed", {
+        requestUrl,
+        resultKeys: result && typeof result === "object" ? Object.keys(result) : [],
+      });
+      // #endregion
       setRecommendation(result);
       setShowDetails(false);
       
@@ -212,6 +250,14 @@ export default function App() {
       }, 800);
       
     } catch (e: any) {
+      // #region debug-point E:recommend-error
+      void reportDebugEvent("E", "src/App.tsx:onSubmit:catch", "recommend request failed", {
+        message: e?.message,
+        stack: e?.stack,
+        href: window.location.href,
+        origin: window.location.origin,
+      });
+      // #endregion
       alert("推演失败：" + e.message);
       setHomeView('input');
       setLoadingProgress(0);
@@ -222,7 +268,7 @@ export default function App() {
     if (!recommendation) return;
     setIsSaving(true);
     try {
-      const res = await fetch("/api/recipes", {
+      const { response: res } = await apiJson<{ id: number }>("/api/recipes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(recommendation)
@@ -759,7 +805,7 @@ export default function App() {
                       onClick={() => {
                         if (showDetailDeleteConfirm) {
                           if (recommendation && 'id' in recommendation) {
-                            fetch(`/api/recipes/${(recommendation as any).id}`, { method: 'DELETE' }).then(() => {
+                            apiJson<{ success: boolean }>(`/api/recipes/${(recommendation as any).id}`, { method: 'DELETE' }).then(() => {
                               setHistoryView('list');
                               setShowDetailDeleteConfirm(false);
                             });
@@ -1053,13 +1099,44 @@ function HistoryView({ onSelectRecipe }: { onSelectRecipe: (r: RecipeRecommendat
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch("/api/recipes")
-      .then(r => r.json())
-      .then(data => {
+    const requestUrl = resolveApiUrl("/api/recipes");
+    // #region debug-point F:history-request
+    void reportDebugEvent("F", "src/App.tsx:HistoryView:beforeFetch", "history request start", {
+      href: window.location.href,
+      origin: window.location.origin,
+      requestUrl,
+    });
+    // #endregion
+    apiJson<SavedRecipe[]>("/api/recipes")
+      .then(({ data, response: r }) => {
+        // #region debug-point G:history-response
+        void reportDebugEvent("G", "src/App.tsx:HistoryView:afterFetch", "history response received", {
+          requestUrl,
+          status: r.status,
+          ok: r.ok,
+          redirected: r.redirected,
+          responseUrl: r.url,
+          contentType: r.headers.get("content-type"),
+        });
+        // #endregion
+        // #region debug-point H:history-json
+        void reportDebugEvent("H", "src/App.tsx:HistoryView:afterJson", "history json parsed", {
+          requestUrl,
+          itemCount: Array.isArray(data) ? data.length : -1,
+        });
+        // #endregion
         setRecipes(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((e) => {
+        // #region debug-point I:history-error
+        void reportDebugEvent("I", "src/App.tsx:HistoryView:catch", "history request failed", {
+          message: e?.message,
+          stack: e?.stack,
+          href: window.location.href,
+          origin: window.location.origin,
+        });
+        // #endregion
         console.error("Failed to load history", e);
         setLoading(false);
       });
@@ -1135,7 +1212,7 @@ function HistoryView({ onSelectRecipe }: { onSelectRecipe: (r: RecipeRecommendat
                   onClick={(e) => {
                     e.stopPropagation();
                     if (deletingId === recipe.id) {
-                      fetch(`/api/recipes/${recipe.id}`, { method: 'DELETE' }).then(() => {
+                      apiJson<{ success: boolean }>(`/api/recipes/${recipe.id}`, { method: 'DELETE' }).then(() => {
                         setRecipes(prev => prev.filter(r => r.id !== recipe.id));
                         setDeletingId(null);
                       });
