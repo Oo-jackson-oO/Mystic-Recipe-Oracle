@@ -108,13 +108,13 @@ npm run lint     # TypeScript 类型检查
 - `PORT`：服务监听端口，默认可设为 `3000`
 - `NODE_ENV`：运行环境，生产构建时通常为 `production`
 - `SILICONFLOW_API_KEY`：用于生成菜谱内容
-- `SILICONFLOW_MODEL`：可选，覆盖默认聊天模型
+- `SILICONFLOW_MODEL`：用于指定聊天模型，必须显式配置
 - `ARK_API_KEY`：用于生成菜品图片
-- `ARK_MODEL`：可选，覆盖默认图像模型
+- `ARK_MODEL`：用于指定图像模型，必须显式配置
 
 说明：
 
-- 代码当前已经内置了部分回退值/默认模型，推荐在正式使用前统一改为通过环境变量注入。
+- 服务启动时会严格校验上述关键环境变量，缺失任意一项都会直接报错退出。
 - 项目运行后会在根目录生成 `recipes.db`，用于保存历史灵膳记录。
 
 ## Android 构建

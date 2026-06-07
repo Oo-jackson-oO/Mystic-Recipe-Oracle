@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
-import fs from "fs";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -31,6 +30,19 @@ const insertRecipe = db.prepare(
 const getRecipes = db.prepare("SELECT * FROM recipes ORDER BY createdAt DESC");
 const deleteRecipe = db.prepare("DELETE FROM recipes WHERE id = ?");
 
+/**
+ * 读取必需环境变量，缺失时立即终止，避免服务在不完整配置下运行。
+ */
+function requireEnv(name: string) {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    throw new Error(`缺少必需环境变量 ${name}，请先更新 .env 后再启动服务。`);
+  }
+
+  return value;
+}
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
@@ -51,7 +63,10 @@ async function startServer() {
   });
 
   // API constraints
-  const SILICONFLOW_API_KEY = process.env.SILICONFLOW_API_KEY || "sk-qvpckopchrgnkpronkzwxbvzwaebzwltdgzamzaupucuddvu";
+  const SILICONFLOW_API_KEY = requireEnv("SILICONFLOW_API_KEY");
+  const SILICONFLOW_MODEL = requireEnv("SILICONFLOW_MODEL");
+  const ARK_API_KEY = requireEnv("ARK_API_KEY");
+  const ARK_MODEL = requireEnv("ARK_MODEL");
   
   app.post("/api/recommend", async (req, res) => {
     try {
@@ -74,7 +89,7 @@ async function startServer() {
           "Authorization": `Bearer ${SILICONFLOW_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "nex-agi/Nex-N2-Pro",
+          model: SILICONFLOW_MODEL,
           temperature: 0.8,
           stream: false,
           messages: [
@@ -149,7 +164,7 @@ async function startServer() {
             "Authorization": `Bearer ${SILICONFLOW_API_KEY}`,
           },
           body: JSON.stringify({
-            model: "nex-agi/Nex-N2-Pro",
+            model: SILICONFLOW_MODEL,
             temperature: 1.2,
             stream: false,
             messages: [
@@ -225,7 +240,6 @@ async function startServer() {
       recipe.originalImageUrl = `data:image/jpeg;base64,${imageBase64}`;
 
       // Start Image Generation sequentially using generated prompt
-      const ARK_API_KEY = "5ba3ef10-df27-4ac2-bc8e-07f3ab86de79"; // hardcoded for task
       const constructedImagePrompt = recipe.imagePrompt || "星际穿越，黑洞，黑洞里冲出一辆快支离破碎的复古列车，抢视觉冲击力，电影大片，末日既视感，动感，对比色，oc渲染，光线追踪，动态模糊，景深，超现实主义，深蓝，画面通过细腻的丰富的色彩层次塑造主体与场景，质感真实，暗黑风背景的光影效果营造出氛围，整体兼具艺术幻想感，夸张的广角透视效果，耀光，反射，极致的光影，强引力，吞噬";
       
       try {
@@ -236,7 +250,7 @@ async function startServer() {
             "Authorization": `Bearer ${ARK_API_KEY}`,
           },
           body: JSON.stringify({
-            model: "ep-20260531002257-flngb",
+            model: ARK_MODEL,
             prompt: constructedImagePrompt,
             sequential_image_generation: "disabled",
             response_format: "url",
